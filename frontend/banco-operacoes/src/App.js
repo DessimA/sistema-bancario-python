@@ -1,5 +1,10 @@
-import React, { useState } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from 'react';
+import Header from './components/Header/Header';
+import InputValor from './components/InputValor/InputValor';
+import SaldoContainer from './components/SaldoContainer/SaldoContainer';
+import OperacoesContainer from './components/OperacoesContainer/OperacoesContainer';
+import ExtratoModal from './components/ExtratoModal/ExtratoModal'; // Importar o novo componente ExtratoModal
+import { consultarSaldo, realizarDeposito, realizarSaque, consultarExtrato } from './api';
 import './App.css';
 
 function App() {
@@ -7,72 +12,72 @@ function App() {
   const [valorOperacao, setValorOperacao] = useState('');
   const [mensagem, setMensagem] = useState('');
   const [modoEscuro, setModoEscuro] = useState(false);
+  const [extrato, setExtrato] = useState([]);
+  const [showExtrato, setShowExtrato] = useState(false);
 
-  const consultarSaldo = async () => {
-    try {
-      const response = await axios.get('http://localhost:5000/saldo');
-      setSaldo(response.data.saldo);
-      setMensagem('');
-    } catch (error) {
-      setMensagem('Erro ao consultar saldo.');
-    }
-  };
-
-  const realizarDeposito = async () => {
-    try {
-      await axios.post('http://localhost:5000/deposito', { valor: Number(valorOperacao) });
-      setValorOperacao('');
-      consultarSaldo();
-      setMensagem('Depósito realizado com sucesso!');
-    } catch (error) {
-      setMensagem('Erro ao realizar depósito.');
-    }
-  };
-
-  const realizarSaque = async () => {
-    try {
-      await axios.post('http://localhost:5000/saque', { valor: Number(valorOperacao) });
-      setValorOperacao('');
-      consultarSaldo();
-      setMensagem('Saque realizado com sucesso!');
-    } catch (error) {
-      setMensagem('Erro ao realizar saque.');
-    }
-  };
+  useEffect(() => {
+    handleConsultarSaldo();
+  }, []);
 
   const toggleModoEscuro = () => {
     setModoEscuro(!modoEscuro);
   };
 
+  const handleConsultarSaldo = () => {
+    consultarSaldo()
+      .then((saldoAtual) => setSaldo(parseFloat(saldoAtual)))
+      .catch((error) => setMensagem(error.message));
+  };
+
+  const handleRealizarDeposito = () => {
+    realizarDeposito(valorOperacao)
+      .then(() => {
+        setValorOperacao('');
+        handleConsultarSaldo();
+        setMensagem('Depósito realizado com sucesso!');
+      })
+      .catch((error) => setMensagem(error.message));
+  };
+
+  const handleRealizarSaque = () => {
+    realizarSaque(valorOperacao)
+      .then(() => {
+        setValorOperacao('');
+        handleConsultarSaldo();
+        setMensagem('Saque realizado com sucesso!');
+      })
+      .catch((error) => setMensagem(error.message));
+  };
+
+  const handleExtrato = () => {
+    consultarExtrato()
+      .then((extratoData) => {
+        setExtrato(extratoData.extrato);
+        setShowExtrato(true);
+      })
+      .catch((error) => setMensagem(error.message));
+  };
+
+  const handleCloseExtrato = () => {
+    setShowExtrato(false);
+  };
+
   return (
     <div className={`container ${modoEscuro ? 'modo-escuro' : ''}`}>
-      <header>
-        <h1>Banco React</h1>
-        <button className="modo-escuro-button" onClick={toggleModoEscuro}>
-        {modoEscuro ? '🌞' : '🌜'}
-          {modoEscuro ? <i className="fas fa-sun"></i> : <i className="fas fa-moon"></i>}
-        </button>
-      </header>
-      <input
-        type="number"
-        placeholder="Digite o valor da operação"
-        value={valorOperacao}
-        onChange={(e) => setValorOperacao(e.target.value)}
+      <Header modoEscuro={modoEscuro} onToggleModoEscuro={toggleModoEscuro} />
+      <InputValor
+        valorOperacao={valorOperacao}
+        onChangeValorOperacao={(e) => setValorOperacao(e.target.value)}
       />
-      <div className="saldo-container">
-        <button className="button-consultar-saldo" onClick={consultarSaldo}>
-          Consultar Saldo
-        </button>
-        <p>Saldo: R$ {saldo.toFixed(2)}</p>
-      </div>
-      <div className="operacoes-container">
-        <button className="depositar" onClick={realizarDeposito}>
-          Depositar
-        </button>
-        <button className="sacar" onClick={realizarSaque}>
-          Sacar
-        </button>
-      </div>
+      <SaldoContainer saldo={saldo} onConsultarSaldo={handleConsultarSaldo} />
+      <OperacoesContainer
+        onRealizarDeposito={handleRealizarDeposito}
+        onRealizarSaque={handleRealizarSaque}
+        onExtrato={handleExtrato}
+      />
+      {showExtrato && extrato.length > 0 && ( // Exibir o ExtratoModal apenas se showExtrato for true e extrato possuir movimentações
+        <ExtratoModal extrato={extrato} saldo={saldo} onClose={handleCloseExtrato} />
+      )}
       {mensagem && <p className="mensagem">{mensagem}</p>}
     </div>
   );
